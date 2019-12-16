@@ -5,6 +5,50 @@ import re
 first_cap_re = re.compile('(.)([A-Z][a-z]+)')
 all_cap_re = re.compile('([a-z0-9])([A-Z])')
 
+
+class Codecaser:
+
+	def __init__(self, target_file, from_case, to_case, ignore_comments=True, in_place=False, destination=None):
+		self.from_case = from_case
+		self.to_case = to_case
+		self.ignore_comments = ignore_comments
+		self.in_place = in_place
+
+		in_file = open(target_file, "r")
+		self.contents = in_file.read()
+		in_file.close()
+
+		self.package_names = set()
+
+		if in_place:
+			destination = target_file
+
+		if destination is None:
+			self.destination = self.to_case + '__' + target_file.split('/')[-1]
+		else:
+			self.destination = destination
+
+	def read_packages(self):
+		for line in self.contents.splitlines():
+			if 'import' in line:
+				if 'as' in line:
+					package = line.split('as ')[-1].split(' ')[0]
+					self.package_names.add(package)
+				package = line.split('import ')[-1].split(' ')[0]
+				self.package_names.add(package)
+
+	def process(self):
+		with open(self.destination, 'w') as out:
+			for line in self.contents.splitlines():
+				new_line = str(line)
+				for string in re.sub("[^a-zA-Z.]+", " ", line).split(' '):
+					for substring in string.split('.'):
+						if substring in self.package_names:
+							continue
+						new_line.replace(substring, camel_to_snake(substring))
+				out.write('%s' % new_line + os.linesep)
+
+
 def camel_to_snake(string):
 	s1 = first_cap_re.sub(r'\1_\2', string)
 	return all_cap_re.sub(r'\1_\2', s1).lower()
@@ -32,12 +76,6 @@ def process(args):
 				new_string = change_casing(string, args)
 				new_line = new_line.replace(string, new_string)
 			out.write('%s' % new_line + os.linesep)
-
-
-'''def process_line(line):
-	new_line = str(line)
-	split_line = re.split(re.sub("[^a-zA-Z.]+", " ", line), ' ')
-	for string in split_line:'''
 
 
 # Need to account for quotations, punctuation, etc.
