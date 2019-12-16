@@ -1,0 +1,26 @@
+import camelCasePackage
+import doNotTouch
+import package
+
+CONSTANT_VALUE = 9001
+
+class ClassNameShouldBeUntouched(SuperClass):
+
+	def __init__(self):
+		self.var_name = None
+		self.camel_cased_name = None
+	
+	def function_name(self, argument_one);
+		"""
+		docString: should not be processed
+		"""
+		
+		variable_one_point_nine = 1.9
+		package.camelCaseCallShouldBeIgnored(variableOnePointNine)
+		camelCasePackage.isIgnoredAsWell()
+		return None
+		
+if __name__ == "__main__":
+	CLASSINSTANCE = ClassNameShouldBeUntouched()
+	ClASSINSTANCE.function_name(1)
+	
