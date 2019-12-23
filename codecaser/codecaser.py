@@ -1,65 +1,91 @@
 import argparse
 import os
 import re
+import keyword
+import builtins
 
+# Precompiled Regex (for faster processing) #
 first_cap_re = re.compile('(.)([A-Z][a-z]+)')
 all_cap_re = re.compile('([a-z0-9])([A-Z])')
 
+
+# Casing Functions
+# --##--##--##--##--##--##--##--##--##-- #
 def camel_to_snake(string):
-	s1 = first_cap_re.sub(r'\1_\2', string)
-	return all_cap_re.sub(r'\1_\2', s1).lower()
+    s1 = first_cap_re.sub(r'\1_\2', string)
+    return all_cap_re.sub(r'\1_\2', s1).lower()
 
 
 def snake_to_camel(string):
-	pass
+    pass
 
 
-def process(args):
-	if args.i:
-		output_file = args.target_file
-	else:
-		output_file = args.to_case + '__' + args.target_file.split('/')[-1]
+# --##--##--##--##--##--##--##--##--##-- #
 
-	in_file = open(args.target_file, "r")
-	contents = in_file.read()
-
-	in_file.close()
-
-	with open(output_file, 'w') as out:
-		for line in contents.splitlines():
-			new_line = str(line)
-			for string in re.split('\W+', line):
-				new_string = change_casing(string, args)
-				new_line = new_line.replace(string, new_string)
-			out.write('%s' % new_line + os.linesep)
+# Casing Function Map (Nested mapped to from_case and to_case) #
+CASING_FUNCTIONS = {
+    'snake': {
+        'camel': camel_to_snake
+    },
+    'camel': {
+        'snake': snake_to_camel
+    }
+}
 
 
-'''def process_line(line):
-	new_line = str(line)
-	split_line = re.split(re.sub("[^a-zA-Z.]+", " ", line), ' ')
-	for string in split_line:'''
+class Codecaser:
+    def __init__(self, input_path, in_place=False, output_filename=None):
+        self.input_path = input_path
+        self.dir, self.input_filename = os.path.split(input_path)
+        if in_place:
+            self.output_path = os.path.join(self.dir, self.input_filename)
+        else:
+            if output_filename is not None:
+                self.output_path = os.path.join(self.dir, output_filename)
+            else:
+                self.output_path = os.path.join(self.dir, 'codecased__' + self.input_filename)
+        self.ignored_strings = set()
+        self.ignored_strings.update(keyword.kwlist)
+        self.ignored_strings.update(dir(builtins))
+        self.detect_key_strings()
 
+    def detect_key_strings(self):
+        with open(self.input_path, "r") as in_file:
+            contents = in_file.read()
+            for line in contents.splitlines():
+                strings = re.split('\W+', line)
+                for i, string in enumerate(strings):
+                    if string in {'from', 'import', 'class'}:
+                        self.ignored_strings.update(strings)
 
-# Need to account for quotations, punctuation, etc.
-def change_casing(string, args):
-	if args.to_case == 'snake':
-		return camel_to_snake(string)
-	elif args.to_case == 'camel':
-		return snake_to_camel(string)
+    def process(self, casing_function):
+        in_file = open(self.input_path, "r")
+        contents = in_file.read()
+        in_file.close()
 
+        with open(self.output_path, 'w') as out_file:
+            for line in contents.splitlines():
+                new_line = str(line)
+                for string in re.split('[^.\w+]', line):
+                    sdot = string.split('.')
+                    if sdot[0] in self.ignored_strings:
+                        continue
+                    for s in sdot:
+                        if s.isupper():
+                            continue
+                        new_string = casing_function(s)
+                        new_line = new_line.replace(s, new_string)
+                out_file.write('%s' % new_line + os.linesep)
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="Change variable casing of your files.")
-	parser.add_argument('target_file')
-	parser.add_argument('--from_case', default='camel')
-	parser.add_argument('--to_case', default='snake')
-	parser.add_argument('-i')
+    parser = argparse.ArgumentParser(description="Change variable casing of your files.")
+    parser.add_argument('target_file')
+    parser.add_argument('--from_case', default='camel')
+    parser.add_argument('--to_case', default='snake')
+    parser.add_argument('-i')
+    parser.add_argument('--output', default=None)
 
-	args = parser.parse_args()
+    args = parser.parse_args()
 
-	process(args)
-
-
-
-
-
+    codecaser = Codecaser(args.target_file, in_place=args.i, output_filename=args.output)
+    codecaser.process(CASING_FUNCTIONS[args.from_case][args.to_case])

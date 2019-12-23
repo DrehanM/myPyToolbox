@@ -12,7 +12,7 @@ class ClassNameShouldBeUntouched(SuperClass):
 	
 	def functionName(self, argumentOne);
 		"""
-		docString: should not be processed
+		docString: should be processed
 		"""
 		
 		variableOnePointNine = 1.9
@@ -22,5 +22,4 @@ class ClassNameShouldBeUntouched(SuperClass):
 		
 if __name__ == "__main__":
 	CLASSINSTANCE = ClassNameShouldBeUntouched()
-	ClASSINSTANCE.functionName(1)
-	
+	CLASSINSTANCE.functionName(1)
