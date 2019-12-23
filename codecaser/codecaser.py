@@ -17,18 +17,24 @@ def camel_to_snake(string):
 
 
 def snake_to_camel(string):
-    pass
+    if string[0] == '_':
+        return string
+    groups = string.split('_')
+    result = groups[0]
+    if len(groups) > 1:
+        result += ''.join([g[0].upper() + g[1:] for g in groups[1:]])
+    return result
 
 
 # --##--##--##--##--##--##--##--##--##-- #
 
 # Casing Function Map (Nested mapped to from_case and to_case) #
 CASING_FUNCTIONS = {
-    'snake': {
-        'camel': camel_to_snake
-    },
     'camel': {
-        'snake': snake_to_camel
+        'snake': camel_to_snake
+    },
+    'snake': {
+        'camel': snake_to_camel
     }
 }
 
@@ -76,6 +82,7 @@ class Codecaser:
                         new_string = casing_function(s)
                         new_line = new_line.replace(s, new_string)
                 out_file.write('%s' % new_line + os.linesep)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Change variable casing of your files.")
