@@ -1,8 +1,10 @@
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 import argparse
 import pause
 from datetime import datetime, timedelta
 import os
+import logging
 
 CHECKIN_URL = "https://www.southwest.com/air/check-in/index.html"
 MAX_ATTEMPTS = 3
@@ -15,10 +17,14 @@ LAST_NAME_ELEMENT_ID = "passengerLastName"
 CONF_NUM_ELEMENT_ID = "confirmationNumber"
 SUBMIT_ELEMENT_ID = "form-mixin--submit-button"
 
-CONFIRM_CHECKIN_ELEMENT_CLASS = "air-checkin-review-results--check-in-button"
+CONFIRM_CHECKIN_ELEMENT_CLASS = "submit-button"
 TEXT_TICKET_ELEMENT_CLASS = "boarding-pass-options--button-text"
 PHONE_INPUT_ELEMENT_ID = "textBoardingPass"
 PHONE_CONFIRMATION_ELEMENT_ID = "textBoardingPassConfirmation"
+
+LOGGING_FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=LOGGING_FORMAT)
+LOGGER = logging.getLogger("southwest-checkin-script")
 
 
 class Reservation:
@@ -31,11 +37,8 @@ class Reservation:
         self.flight_date = flight_date
         self.flight_time = flight_time
 
-        print(self.flight_date, self.flight_time)
-
-        options = webdriver.ChromeOptions()
-        options.headless = True
-        self.driver = webdriver.Chrome(executable_path=DRIVER_BIN, options=options)
+        LOGGER.critical("Set up auto check-in for {first} {last} with confirmation number {conf}"
+                        .format(first=first, last=last, conf=conf_number))
 
     def checkin(self):
         self.driver.get(CHECKIN_URL)
@@ -50,11 +53,21 @@ class Reservation:
         checkin_button.click()
 
     def confirm_reservation(self):
+        pause.sleep(3)
         confirm_button = self.driver.find_element_by_class_name(CONFIRM_CHECKIN_ELEMENT_CLASS)
+        pause.sleep(1)
+        LOGGER.critical("Confirming Reservation...")
         confirm_button.click()
 
     def text_boarding_pass(self):
-        text_option_button = self.driver.find_element_by_class_name(TEXT_TICKET_ELEMENT_CLASS)
+        pause.sleep(1)
+        try:
+            text_option_button = self.driver.find_element_by_class_name(TEXT_TICKET_ELEMENT_CLASS)
+        except NoSuchElementException:
+            LOGGER.error("Cannot text boarding pass. Reservation is either international or for multiple passengers.")
+            return
+
+        pause.sleep(1)
         text_option_button.click()
 
         phone_input = self.driver.find_element_by_id(PHONE_INPUT_ELEMENT_ID)
@@ -71,6 +84,7 @@ class Reservation:
 
     def sleep(self):
         checkin_time = self.get_checkin_time()
+        LOGGER.critical("Going to sleep until {time}".format(time=checkin_time))
         pause.until(checkin_time)
 
     def get_checkin_time(self):
@@ -79,15 +93,24 @@ class Reservation:
 
         takeoff_datetime = datetime(date_map["year"], date_map["month"], date_map["day"], time_map["hour"],
                                     time_map["min"])
-        checkin_datetime = takeoff_datetime - timedelta(days=1)
+        checkin_datetime = takeoff_datetime - timedelta(days=1) + timedelta(seconds=10)
 
         return checkin_datetime
 
-    def restart_driver(self):
-        self.driver.close()
+    def start_driver(self):
+        LOGGER.critical("Starting Chrome Driver...")
         options = webdriver.ChromeOptions()
-        options.headless = True
+        options.headless = False
         self.driver = webdriver.Chrome(executable_path=DRIVER_BIN, options=options)
+        self.driver.implicitly_wait(3)
+
+    def kill_driver(self):
+        LOGGER.critical("Killing Chrome Driver and exiting script...")
+        self.driver.close()
+
+    def restart_driver(self):
+        self.kill_driver()
+        self.start_driver()
 
 
 if __name__ == "__main__":
@@ -106,13 +129,20 @@ if __name__ == "__main__":
 
     r.sleep()
 
+    r.start_driver()
+
     for i in range(MAX_ATTEMPTS):
         try:
             r.checkin()
             r.confirm_reservation()
-            r.text_boarding_pass()
-        except:
+            break
+        except Exception as e:
+            LOGGER.exception("Exception occurred, restarting...")
             r.restart_driver()
+
+    r.text_boarding_pass()
+
+    r.kill_driver()
 
 
 
